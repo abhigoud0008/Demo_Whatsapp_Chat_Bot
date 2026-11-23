@@ -185,6 +185,20 @@ This fix addresses the **known runtime/module compatibility failure**, but the l
 
 ---
 
+## Fixing Netlify `ERR_REQUIRE_ESM` in `jwks-rsa`
+
+The previous Node 24-only fix was not sufficient on deployed Netlify functions. The `firebase-admin@14.5.1` dependency tree contains `jwks-rsa@4.1.0` which loads ESM-only `jose@6` through CommonJS `require()` in the failing runtime. This branch pins `firebase-admin` to `13.10.0` (which uses `jwks-rsa@^3.1.0`) and removes the stale Bun lockfile so Netlify's npm install resolves a consistent tree.
+
+1. Merge the PR. In Netlify, deploy the updated **main** branch, using **Clear cache and deploy site**.
+2. Ensure build logs show installation of `firebase-admin@13.10.0`, not v14, and `jwks-rsa@3.x` rather than v4. Optionally run `npm ls firebase-admin jwks-rsa jose` locally.
+3. Run `npm run verify:admin-import` after installing dependencies. This checks the Admin SDK import path without credentials or accessing Firebase.
+4. Open `/api/health/status` and confirm it returns JSON rather than a Netlify crash. Then test login, password reset, and WhatsApp webhook verification separately.
+5. Do not share or regenerate Firebase/WhatsApp secrets to fix this module incompatibility.
+
+This is a targeted dependency fix. Full deploy/runtime behavior still requires a real Netlify verification.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely Cause | Fix |
