@@ -1,0 +1,347 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Core Security Primitives
+    // -------------------------------------------------------------------------
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function hasAdminDoc() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function adminData() {
+      return get(/databases/$(database)/documents/admins/$(request.auth.uid)).data;
+    }
+
+    function isActiveAdmin() {
+      return hasAdminDoc() &&
+        adminData().active == true &&
+        adminData().role in ['super_admin', 'admin', 'reviewer', 'Super Admin', 'Admin', 'Read-Only Reviewer'];
+    }
+
+    function isWriterAdmin() {
+      return hasAdminDoc() &&
+        adminData().active == true &&
+        adminData().role in ['super_admin', 'admin', 'Super Admin', 'Admin'];
+    }
+
+    function isSuperAdmin() {
+      return hasAdminDoc() &&
+        adminData().active == true &&
+        adminData().role in ['super_admin', 'Super Admin'];
+    }
+
+    // -------------------------------------------------------------------------
+    // Entity Validation Blueprints (Synchronized with firebase-blueprint.json)
+    // -------------------------------------------------------------------------
+    function isValidComplaint(data) {
+      return data.keys().hasAll([
+          'ticketId', 'customerPhone', 'description', 'category', 'priority',
+          'status', 'assignedAdminId', 'assignedAdminName', 'createdAt',
+          'updatedAt', 'resolutionNotes', 'notificationStatus', 'source'
+        ]) &&
+        data.keys().hasOnly([
+          'ticketId', 'customerPhone', 'description', 'category', 'priority',
+          'status', 'assignedAdminId', 'assignedAdminName', 'createdAt',
+          'updatedAt', 'resolvedAt', 'resolutionNotes', 'notificationStatus',
+          'source', 'lastCustomerMessageAt'
+        ]) &&
+        data.ticketId is string && data.ticketId.size() >= 8 && data.ticketId.size() <= 20 &&
+        data.ticketId.matches('^GRV-[0-9]{4,8}$') &&
+        data.customerPhone is string && data.customerPhone.size() >= 7 && data.customerPhone.size() <= 32 &&
+        data.customerPhone.matches('^\\+?[0-9]{7,15}$') &&
+        data.description is string && data.description.size() >= 5 && data.description.size() <= 2000 &&
+        data.category in [
+          'Water Supply', 'Electricity', 'Sanitation', 'Roads & Infrastructure',
+          'Billing & Account', 'Service Delay', 'General'
+        ] &&
+        data.priority in ['Low', 'Medium', 'High', 'Urgent'] &&
+        data.status in ['Pending', 'In Progress', 'Resolved'] &&
+        data.assignedAdminId is string && data.assignedAdminId.size() <= 128 &&
+        data.assignedAdminName is string && data.assignedAdminName.size() <= 120 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp &&
+        (!('resolvedAt' in data) || data.resolvedAt == null || data.resolvedAt is timestamp) &&
+        data.resolutionNotes is string && data.resolutionNotes.size() <= 2000 &&
+        data.notificationStatus in ['Not Sent', 'Queued', 'Sent', 'Delivered', 'Read', 'Failed', 'Not Connected'] &&
+        data.source in ['whatsapp', 'simulator'] &&
+        (!('lastCustomerMessageAt' in data) || data.lastCustomerMessageAt is timestamp);
+    }
+
+    function isValidComplaintHistory(data) {
+      return data.keys().hasAll([
+          'complaintId', 'ticketId', 'previousStatus', 'newStatus',
+          'changedBy', 'changedByName', 'timestamp', 'remarks'
+        ]) &&
+        data.keys().hasOnly([
+          'complaintId', 'ticketId', 'previousStatus', 'newStatus',
+          'changedBy', 'changedByName', 'timestamp', 'remarks'
+        ]) &&
+        data.complaintId is string && data.complaintId.size() >= 1 && data.complaintId.size() <= 128 &&
+        data.ticketId is string && data.ticketId.size() >= 8 && data.ticketId.size() <= 20 &&
+        data.ticketId.matches('^GRV-[0-9]{4,8}$') &&
+        data.previousStatus in ['None', 'Pending', 'In Progress', 'Resolved'] &&
+        data.newStatus in ['Pending', 'In Progress', 'Resolved'] &&
+        data.changedBy is string && data.changedBy.size() >= 1 && data.changedBy.size() <= 128 &&
+        data.changedByName is string && data.changedByName.size() >= 1 && data.changedByName.size() <= 120 &&
+        data.timestamp is timestamp &&
+        data.remarks is string && data.remarks.size() >= 1 && data.remarks.size() <= 2000;
+    }
+
+    function isValidNotificationLog(data) {
+      return data.keys().hasAll([
+          'complaintId', 'ticketId', 'messageId', 'recipient',
+          'messageType', 'status', 'error', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'complaintId', 'ticketId', 'messageId', 'recipient',
+          'messageType', 'status', 'error', 'createdAt', 'updatedAt'
+        ]) &&
+        data.complaintId is string && data.complaintId.size() >= 1 && data.complaintId.size() <= 128 &&
+        data.ticketId is string && data.ticketId.size() <= 20 &&
+        data.messageId is string && data.messageId.size() <= 128 &&
+        data.recipient is string && data.recipient.size() >= 7 && data.recipient.size() <= 32 &&
+        data.messageType in ['acknowledgment', 'status_reply', 'resolution_service', 'resolution_template', 'menu_reply'] &&
+        data.status in ['accepted_by_meta', 'sent', 'delivered', 'read', 'failed', 'not_connected'] &&
+        data.error is string && data.error.size() <= 1000 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAdminUser(data) {
+      return data.keys().hasAll(['uid', 'username', 'email', 'displayName', 'role', 'active', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'username', 'email', 'displayName', 'role', 'active', 'createdAt', 'updatedAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+        data.username is string && data.username.size() >= 3 && data.username.size() <= 32 &&
+        data.username.matches('^[a-z0-9][a-z0-9._\\-]{2,31}$') &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120 &&
+        data.role in ['super_admin', 'admin', 'reviewer'] &&
+        data.active is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAdminAuditLog(data) {
+      return data.keys().hasAll(['action', 'actorUid', 'actorUsername', 'actorEmail', 'targetId', 'details', 'timestamp']) &&
+        data.keys().hasOnly(['action', 'actorUid', 'actorUsername', 'actorEmail', 'targetId', 'details', 'timestamp']) &&
+        data.action in [
+          'login_success', 'login_failed', 'login_rate_limited', 'login_denied_disabled',
+          'login_denied_unauthorized', 'logout', 'password_reset_requested',
+          'mfa_enrolled', 'mfa_unenrolled', 'admin_created', 'admin_updated',
+          'admin_removed', 'bootstrap_super_admin', 'complaint_assigned',
+          'complaint_in_progress', 'complaint_resolved', 'complaint_reopened'
+        ] &&
+        data.actorUid is string && data.actorUid.size() >= 1 && data.actorUid.size() <= 128 &&
+        data.actorUsername is string && data.actorUsername.size() <= 32 &&
+        data.actorEmail is string && data.actorEmail.size() <= 254 &&
+        data.targetId is string && data.targetId.size() <= 128 &&
+        data.details is string && data.details.size() <= 500 &&
+        data.timestamp is timestamp;
+    }
+
+    function isValidCounter(data) {
+      return data.keys().hasAll(['nextNumber', 'updatedAt']) &&
+        data.keys().hasOnly(['nextNumber', 'updatedAt']) &&
+        data.nextNumber is int && data.nextNumber >= 1001 && data.nextNumber <= 99999999 &&
+        data.updatedAt is timestamp;
+    }
+
+    // -------------------------------------------------------------------------
+    // Complaints Collection
+    // -------------------------------------------------------------------------
+    match /complaints/{complaintId} {
+      allow get: if isValidId(complaintId) && isActiveAdmin();
+      allow list: if isActiveAdmin();
+
+      allow create: if isValidId(complaintId) &&
+        isWriterAdmin() &&
+        isValidComplaint(incoming()) &&
+        incoming().status == 'Pending' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(complaintId) &&
+        isWriterAdmin() &&
+        isValidComplaint(incoming()) &&
+        incoming().ticketId == existing().ticketId &&
+        incoming().customerPhone == existing().customerPhone &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().source == existing().source &&
+        incoming().updatedAt == request.time && (
+          // Action: Assign or update priority/category
+          (
+            incoming().status == existing().status &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['assignedAdminId', 'assignedAdminName', 'priority', 'category', 'updatedAt'])
+          ) ||
+          // Action: Move to In Progress
+          (
+            incoming().status == 'In Progress' &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'assignedAdminId', 'assignedAdminName', 'updatedAt', 'resolvedAt'])
+          ) ||
+          // Action: Reopen Resolved complaint back to Pending or In Progress
+          (
+            existing().status == 'Resolved' &&
+            incoming().status in ['Pending', 'In Progress'] &&
+            incoming().resolvedAt == null &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'resolvedAt', 'updatedAt'])
+          ) ||
+          // Action: Resolve complaint (requires resolutionNotes >= 5 chars and resolvedAt == request.time)
+          (
+            incoming().status == 'Resolved' &&
+            incoming().resolutionNotes.size() >= 5 &&
+            incoming().resolvedAt == request.time &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'resolutionNotes', 'resolvedAt', 'notificationStatus', 'assignedAdminId', 'assignedAdminName', 'updatedAt'])
+          ) ||
+          // Action: Update notification delivery status after sending
+          (
+            incoming().status == existing().status &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['notificationStatus', 'updatedAt'])
+          )
+        );
+
+      allow delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Complaint Audit History (Append-Only)
+    // -------------------------------------------------------------------------
+    match /complaint_history/{historyId} {
+      allow get: if isValidId(historyId) && isActiveAdmin();
+      allow list: if isActiveAdmin();
+
+      allow create: if isValidId(historyId) &&
+        isWriterAdmin() &&
+        isValidComplaintHistory(incoming()) &&
+        incoming().changedBy == request.auth.uid &&
+        incoming().timestamp == request.time &&
+        exists(/databases/$(database)/documents/complaints/$(incoming().complaintId));
+
+      allow update, delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Notification Delivery Logs
+    // -------------------------------------------------------------------------
+    match /notification_logs/{logId} {
+      allow get: if isValidId(logId) && isActiveAdmin();
+      allow list: if isActiveAdmin();
+
+      allow create: if isValidId(logId) &&
+        isWriterAdmin() &&
+        isValidNotificationLog(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(logId) &&
+        isWriterAdmin() &&
+        isValidNotificationLog(incoming()) &&
+        incoming().complaintId == existing().complaintId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'messageId', 'error', 'updatedAt']);
+
+      allow delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Authorized Admin Allowlist (Never readable by unauthenticated clients)
+    // -------------------------------------------------------------------------
+    match /admins/{uid} {
+      allow get: if isValidId(uid) && isSignedIn() && (request.auth.uid == uid || isSuperAdmin());
+      allow list: if isSuperAdmin();
+
+      allow create: if isValidId(uid) &&
+        isSuperAdmin() &&
+        isValidAdminUser(incoming()) &&
+        incoming().uid == uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(uid) &&
+        isSuperAdmin() &&
+        isValidAdminUser(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().email == existing().email &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['username', 'displayName', 'role', 'active', 'updatedAt']);
+
+      allow delete: if isValidId(uid) && isSuperAdmin() && request.auth.uid != uid;
+    }
+
+    // -------------------------------------------------------------------------
+    // Security & Administrative Audit Logs (Immutable, Super Admin Read-Only)
+    // -------------------------------------------------------------------------
+    match /admin_audit_logs/{logId} {
+      allow get: if isValidId(logId) && isSuperAdmin();
+      allow list: if isSuperAdmin();
+
+      allow create: if isValidId(logId) &&
+        isActiveAdmin() &&
+        isValidAdminAuditLog(incoming()) &&
+        incoming().actorUid == request.auth.uid &&
+        incoming().timestamp == request.time;
+
+      allow update, delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Collision-Safe Ticket ID Counter
+    // -------------------------------------------------------------------------
+    match /system_counters/{counterId} {
+      allow get: if isValidId(counterId) && isActiveAdmin();
+      allow list: if false;
+
+      allow create: if counterId == 'complaints' &&
+        isWriterAdmin() &&
+        isValidCounter(incoming()) &&
+        incoming().nextNumber == 1001 &&
+        incoming().updatedAt == request.time;
+
+      allow update: if counterId == 'complaints' &&
+        isWriterAdmin() &&
+        isValidCounter(incoming()) &&
+        incoming().nextNumber == existing().nextNumber + 1 &&
+        incoming().updatedAt == request.time;
+
+      allow delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Backend-Only Collections (Strict Client Lockout)
+    // -------------------------------------------------------------------------
+    match /conversation_states/{phoneId} {
+      allow read, write: if false;
+    }
+
+    match /processed_messages/{messageDocId} {
+      allow read, write: if false;
+    }
+
+    match /auth_rate_limits/{keyHash} {
+      allow read, write: if false;
+    }
+  }
+}

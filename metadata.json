@@ -1,0 +1,6 @@
+{
+  "name": "GrievanceFlow",
+  "description": "WhatsApp Grievance Resolution & Complaint Management System powered by Firebase Firestore, Google Sign-In RBAC, and the official Meta WhatsApp Cloud API.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

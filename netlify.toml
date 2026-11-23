@@ -1,0 +1,49 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  included_files = ["firebase-applet-config.json"]
+
+[[redirects]]
+  from = "/api/webhook/whatsapp"
+  to = "/.netlify/functions/whatsapp-webhook"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/whatsapp/notify"
+  to = "/.netlify/functions/whatsapp-notify"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/health"
+  to = "/.netlify/functions/health"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/health/status"
+  to = "/.netlify/functions/health"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/auth/login"
+  to = "/.netlify/functions/auth-login"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/auth/password-reset"
+  to = "/.netlify/functions/auth-password-reset"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

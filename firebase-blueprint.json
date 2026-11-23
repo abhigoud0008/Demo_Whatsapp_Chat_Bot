@@ -1,0 +1,334 @@
+{
+  "entities": {
+    "Complaint": {
+      "title": "Complaint",
+      "description": "A customer grievance ticket submitted via WhatsApp or the authorized demo simulator.",
+      "type": "object",
+      "properties": {
+        "ticketId": {
+          "type": "string",
+          "pattern": "^GRV-[0-9]{4,8}$",
+          "minLength": 8,
+          "maxLength": 20,
+          "description": "Unique collision-safe grievance ticket identifier."
+        },
+        "customerPhone": {
+          "type": "string",
+          "pattern": "^\\+?[0-9]{7,15}$",
+          "minLength": 7,
+          "maxLength": 32,
+          "description": "Customer WhatsApp phone number in E.164 format."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 2000,
+          "description": "Full text description of the customer complaint."
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "Water Supply",
+            "Electricity",
+            "Sanitation",
+            "Roads & Infrastructure",
+            "Billing & Account",
+            "Service Delay",
+            "General"
+          ],
+          "maxLength": 50
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["Low", "Medium", "High", "Urgent"],
+          "maxLength": 20
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Pending", "In Progress", "Resolved"],
+          "maxLength": 20
+        },
+        "assignedAdminId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "assignedAdminName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resolvedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resolutionNotes": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "notificationStatus": {
+          "type": "string",
+          "enum": [
+            "Not Sent",
+            "Queued",
+            "Sent",
+            "Delivered",
+            "Read",
+            "Failed",
+            "Not Connected"
+          ],
+          "maxLength": 30
+        },
+        "source": {
+          "type": "string",
+          "enum": ["whatsapp", "simulator"],
+          "maxLength": 20
+        },
+        "lastCustomerMessageAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ticketId",
+        "customerPhone",
+        "description",
+        "category",
+        "priority",
+        "status",
+        "assignedAdminId",
+        "assignedAdminName",
+        "createdAt",
+        "updatedAt",
+        "resolutionNotes",
+        "notificationStatus",
+        "source"
+      ]
+    },
+    "ConversationState": {
+      "title": "ConversationState",
+      "description": "Server-side deterministic chatbot conversation state per WhatsApp phone number.",
+      "type": "object",
+      "properties": {
+        "phone": { "type": "string", "maxLength": 32 },
+        "currentStep": {
+          "type": "string",
+          "enum": [
+            "IDLE",
+            "MENU_CHOICE",
+            "AWAITING_COMPLAINT_TEXT",
+            "AWAITING_CONFIRMATION",
+            "AWAITING_STATUS_TICKET_ID"
+          ],
+          "maxLength": 40
+        },
+        "draftComplaint": { "type": "string", "maxLength": 2000 },
+        "lastInteractionAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["phone", "currentStep", "draftComplaint", "lastInteractionAt", "updatedAt"]
+    },
+    "ComplaintHistory": {
+      "title": "ComplaintHistory",
+      "description": "Immutable audit trail of complaint status transitions and internal remarks.",
+      "type": "object",
+      "properties": {
+        "complaintId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "ticketId": { "type": "string", "pattern": "^GRV-[0-9]{4,8}$", "maxLength": 20 },
+        "previousStatus": { "type": "string", "maxLength": 20 },
+        "newStatus": { "type": "string", "maxLength": 20 },
+        "changedBy": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "changedByName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "remarks": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      },
+      "required": [
+        "complaintId",
+        "ticketId",
+        "previousStatus",
+        "newStatus",
+        "changedBy",
+        "changedByName",
+        "timestamp",
+        "remarks"
+      ]
+    },
+    "NotificationLog": {
+      "title": "NotificationLog",
+      "description": "Delivery and error audit log for WhatsApp messages sent to customers.",
+      "type": "object",
+      "properties": {
+        "complaintId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "ticketId": { "type": "string", "maxLength": 20 },
+        "messageId": { "type": "string", "maxLength": 128 },
+        "recipient": { "type": "string", "minLength": 7, "maxLength": 32 },
+        "messageType": {
+          "type": "string",
+          "enum": [
+            "acknowledgment",
+            "status_reply",
+            "resolution_service",
+            "resolution_template",
+            "menu_reply"
+          ],
+          "maxLength": 40
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "accepted_by_meta",
+            "sent",
+            "delivered",
+            "read",
+            "failed",
+            "not_connected"
+          ],
+          "maxLength": 30
+        },
+        "error": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "complaintId",
+        "ticketId",
+        "messageId",
+        "recipient",
+        "messageType",
+        "status",
+        "error",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Authorized administrator allowlist record.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "username": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{2,31}$",
+          "minLength": 3,
+          "maxLength": 32
+        },
+        "email": { "type": "string", "minLength": 3, "maxLength": 254 },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "role": {
+          "type": "string",
+          "enum": ["super_admin", "admin", "reviewer"],
+          "maxLength": 30
+        },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "username", "email", "displayName", "role", "active", "createdAt", "updatedAt"]
+    },
+    "AdminAuditLog": {
+      "title": "AdminAuditLog",
+      "description": "Immutable security and administrative action audit log.",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "login_success",
+            "login_failed",
+            "login_rate_limited",
+            "login_denied_disabled",
+            "login_denied_unauthorized",
+            "logout",
+            "password_reset_requested",
+            "mfa_enrolled",
+            "mfa_unenrolled",
+            "admin_created",
+            "admin_updated",
+            "admin_removed",
+            "bootstrap_super_admin",
+            "complaint_assigned",
+            "complaint_in_progress",
+            "complaint_resolved",
+            "complaint_reopened"
+          ],
+          "maxLength": 50
+        },
+        "actorUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "actorUsername": { "type": "string", "maxLength": 32 },
+        "actorEmail": { "type": "string", "maxLength": 254 },
+        "targetId": { "type": "string", "maxLength": 128 },
+        "details": { "type": "string", "maxLength": 500 },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["action", "actorUid", "actorUsername", "actorEmail", "targetId", "details", "timestamp"]
+    },
+    "AuthRateLimit": {
+      "title": "AuthRateLimit",
+      "description": "Backend-only login and password-reset rate limit window state.",
+      "type": "object",
+      "properties": {
+        "count": { "type": "integer" },
+        "windowStartMs": { "type": "integer" },
+        "lockedUntilMs": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["count", "windowStartMs", "lockedUntilMs", "updatedAt"]
+    },
+    "ProcessedMessage": {
+      "title": "ProcessedMessage",
+      "description": "Backend idempotency table tracking WhatsApp message IDs.",
+      "type": "object",
+      "properties": {
+        "whatsappMessageId": { "type": "string", "maxLength": 128 },
+        "processedAt": { "type": "string", "format": "date-time" },
+        "processingStatus": {
+          "type": "string",
+          "enum": ["processing", "completed", "ignored_media", "failed"],
+          "maxLength": 30
+        }
+      },
+      "required": ["whatsappMessageId", "processedAt", "processingStatus"]
+    }
+  },
+  "firestore": {
+    "/complaints/{complaintId}": {
+      "schema": { "$ref": "#/entities/Complaint" },
+      "description": "Customer complaints accessible only to active authenticated administrators."
+    },
+    "/conversation_states/{phoneId}": {
+      "schema": { "$ref": "#/entities/ConversationState" },
+      "description": "Backend-only deterministic chatbot conversation states."
+    },
+    "/complaint_history/{historyId}": {
+      "schema": { "$ref": "#/entities/ComplaintHistory" },
+      "description": "Append-only complaint audit history."
+    },
+    "/notification_logs/{logId}": {
+      "schema": { "$ref": "#/entities/NotificationLog" },
+      "description": "WhatsApp outgoing notification attempts and Meta status updates."
+    },
+    "/admins/{uid}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "Authorized admin allowlist keyed by Firebase Auth UID (never readable by unauthenticated clients)."
+    },
+    "/admin_audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AdminAuditLog" },
+      "description": "Immutable security and administrative action audit trail."
+    },
+    "/auth_rate_limits/{keyHash}": {
+      "schema": { "$ref": "#/entities/AuthRateLimit" },
+      "description": "Backend-only hashed rate-limiting buckets for login and password reset abuse protection."
+    },
+    "/processed_messages/{messageDocId}": {
+      "schema": { "$ref": "#/entities/ProcessedMessage" },
+      "description": "Backend-only WhatsApp message idempotency registry."
+    }
+  }
+}
