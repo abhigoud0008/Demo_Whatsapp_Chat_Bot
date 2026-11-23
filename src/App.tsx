@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppLayout } from './components/AppLayout';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -16,9 +16,11 @@ import { LoginPage } from './pages/LoginPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { OverviewPage } from './pages/OverviewPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { PublicLegalPage } from './pages/PublicLegalPage';
 
 const AppRoutes: React.FC = () => {
   const { status, enterDemoMode } = useAuth();
+  const { pathname } = useLocation();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -26,6 +28,11 @@ const AppRoutes: React.FC = () => {
       enterDemoMode();
     }
   }, [status, enterDemoMode]);
+
+  // Public policies must be accessible to Meta reviewers without admin authentication.
+  if (pathname === '/privacy-policy') return <PublicLegalPage kind="privacy" />;
+  if (pathname === '/terms-of-service') return <PublicLegalPage kind="terms" />;
+  if (pathname === '/data-deletion') return <PublicLegalPage kind="deletion" />;
 
   if (status !== 'authenticated' && status !== 'demo') {
     return <LoginPage />;
