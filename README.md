@@ -171,6 +171,20 @@ In **Meta for Developers → WhatsApp → Configuration → Webhook**:
 
 ---
 
+## Netlify 502 `ERR_REQUIRE_ESM` fix (Firebase Admin SDK)
+
+The Firebase Admin SDK dependency tree includes `jwks-rsa@4.1.0` and ESM-only `jose@6`. An older Netlify Functions Node runtime can crash when `jwks-rsa` loads `jose` with `require()`. This repository selects **Node.js 24** via `.nvmrc` and `package.json#engines`; keep the Netlify Functions runtime aligned with that version.
+
+1. In **Netlify → Site configuration → Environment variables**, add or update `AWS_LAMBDA_JS_RUNTIME` to `nodejs24.x`. Configure this in the **Netlify UI**, not `netlify.toml`. It is a runtime selector, not a secret. If you have a conflicting `NODE_VERSION` setting, change it to `24` as well.
+2. Ensure the project's build log shows Node.js 24. Netlify already uses `esbuild` for functions via `netlify.toml`.
+3. Redeploy from Git with a cleared build cache. Test `/api/health/status` and then sign-in and password reset.
+4. If the functions still return HTTP 502, inspect the actual Netlify Function logs before changing credentials. The environment readiness flags indicate configuration, **not** successful WhatsApp webhook delivery.
+5. Do not modify Firebase secrets, access permissions, JWT validation, or WhatsApp signature verification to work around an ESM import error.
+
+This fix addresses the **known runtime/module compatibility failure**, but the live deployment and Meta webhook must still be verified independently.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely Cause | Fix |
