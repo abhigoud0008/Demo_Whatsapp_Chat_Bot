@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, useReducedMotion } from 'motion/react';
 import {
   AlertCircle,
@@ -535,6 +536,11 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
       </motion.div>
+      <nav aria-label="Public legal information" className="relative z-10 mx-auto mt-6 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-slate-600">
+        <Link className="hover:text-teal-800 hover:underline" to="/privacy-policy">Privacy Policy</Link>
+        <Link className="hover:text-teal-800 hover:underline" to="/terms-of-service">Terms of Service</Link>
+        <Link className="hover:text-teal-800 hover:underline" to="/data-deletion">Data Deletion</Link>
+      </nav>
     </div>
   );
 };
